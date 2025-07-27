@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id           String   @id @default(uuid())
+  name         String
+  type         String
+  description  String
+  propertyIds  String[] @default([])
+  createTime   DateTime @default(now()) @map("create_time")
+  updateTime   DateTime @updatedAt @map("update_time")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@map("events")
+}
+
+model Property {
+  id           String   @id @default(uuid())
+  name         String
+  type         String
+  description  String
+  createTime   DateTime @default(now()) @map("create_time")
+  updateTime   DateTime @updatedAt @map("update_time")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@map("properties")
+}
+
+model TrackingPlan {
+  id           String   @id @default(uuid())
+  name         String
+  description  String
+  eventIds     String[] @default([]) @map("event_ids")
+  createTime   DateTime @default(now()) @map("create_time")
+  updateTime   DateTime @updatedAt @map("update_time")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@map("tracking_plans")
+}

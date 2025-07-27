@@ -1,19 +1,27 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import pool from './utils/db';
+import eventsRouter from './routes/events';
+import prisma from './services/prisma';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-pool.query('SELECT 1')
-    .then(() => console.log('Connected to Postgres!'))
-    .catch((err: unknown) => console.error('DB connection failed:', err));
+// Middleware
+app.use(express.json());
 
+// Test Prisma connection
+prisma.$connect()
+    .then(() => console.log('Connected to database via Prisma!'))
+    .catch((err: unknown) => console.error('Database connection failed:', err));
+
+// Routes
 app.get('/ping', (req, res) => {
     res.json({ message: 'pong' });
 });
+
+app.use('/api/events', eventsRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
