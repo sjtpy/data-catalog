@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import eventsRouter from './routes/events';
 import propertiesRouter from './routes/properties';
+import trackingPlansRouter from './routes/trackingPlans';
 import prisma from './services/prisma';
 
 dotenv.config();
@@ -24,6 +25,7 @@ app.get('/ping', (req, res) => {
 
 app.use('/api/events', eventsRouter);
 app.use('/api/properties', propertiesRouter);
+app.use('/api/plans', trackingPlansRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
