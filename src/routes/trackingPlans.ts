@@ -4,61 +4,51 @@ import { TrackingPlanService } from '../services/trackingPlanService';
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
-    const { name, description, events } = req.body;
+router.post('/', async (req, res, next) => {
+    try {
+        const { name, description, events } = req.body;
 
-    const result = await TrackingPlanService.createTrackingPlan({
-        name,
-        description,
-        events
-    });
+        const trackingPlan = await TrackingPlanService.createTrackingPlan({
+            name,
+            description,
+            events
+        });
 
-    if (result.success) {
         res.status(201).json({
             success: true,
-            data: result.data,
+            data: trackingPlan,
             message: 'Tracking plan created successfully'
         } as ApiResponse);
-    } else {
-        res.status(400).json({
-            success: false,
-            error: result.error
-        } as ApiResponse);
+    } catch (error) {
+        next(error);
     }
 });
 
-router.get('/', async (req, res) => {
-    const result = await TrackingPlanService.getAllTrackingPlans();
+router.get('/', async (req, res, next) => {
+    try {
+        const trackingPlans = await TrackingPlanService.getAllTrackingPlans();
 
-    if (result.success) {
         res.json({
             success: true,
-            data: result.data
+            data: trackingPlans
         } as ApiResponse);
-    } else {
-        res.status(500).json({
-            success: false,
-            error: result.error
-        } as ApiResponse);
+    } catch (error) {
+        next(error);
     }
 });
 
-router.get('/:id', async (req, res) => {
-    const { id } = req.params;
+router.get('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
 
-    const result = await TrackingPlanService.getTrackingPlanById(id);
+        const trackingPlan = await TrackingPlanService.getTrackingPlanById(id);
 
-    if (result.success) {
         res.json({
             success: true,
-            data: result.data
+            data: trackingPlan
         } as ApiResponse);
-    } else {
-        const statusCode = result.error === 'Tracking plan not found' ? 404 : 500;
-        res.status(statusCode).json({
-            success: false,
-            error: result.error
-        } as ApiResponse);
+    } catch (error) {
+        next(error);
     }
 });
 

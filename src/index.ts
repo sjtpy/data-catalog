@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import eventsRouter from './routes/events';
 import propertiesRouter from './routes/properties';
 import trackingPlansRouter from './routes/trackingPlans';
+import { HttpError } from './utils/exceptions';
 import prisma from './services/prisma';
 
 dotenv.config();
@@ -25,7 +26,25 @@ app.get('/ping', (req, res) => {
 
 app.use('/api/events', eventsRouter);
 app.use('/api/properties', propertiesRouter);
-app.use('/api/plans', trackingPlansRouter);
+app.use('/api/tracking-plans', trackingPlansRouter);
+
+// Global error handler middleware
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Error:', error);
+
+    if (error instanceof HttpError) {
+        return res.status(error.statusCode).json({
+            success: false,
+            error: error.message
+        });
+    }
+
+    // Default error response
+    res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+    });
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

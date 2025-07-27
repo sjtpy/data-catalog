@@ -1,4 +1,5 @@
-import { EventType, ApiResponse } from '../types';
+import { EventType } from '../types';
+import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
 import prisma from './prisma';
 
 export class EventService {
@@ -7,40 +8,31 @@ export class EventService {
         type: string;
         description: string;
         propertyIds?: string[];
-    }): Promise<{ success: boolean; data?: any; error?: string }> {
+    }): Promise<any> {
+        // existence validation
+        if (!data.name || !data.type || !data.description) {
+            throw new BadRequestError('Missing required fields: name, type, and description are required');
+        }
+
+        // Validate event type
+        if (!Object.values(EventType).includes(data.type as EventType)) {
+            throw new BadRequestError(`Invalid event type. Must be one of: ${Object.values(EventType).join(', ')}`);
+        }
+
+        // Check for unique name and type
+        const existingEvent = await prisma.event.findFirst({
+            where: {
+                name: data.name,
+                type: data.type,
+                deletedAt: null
+            }
+        });
+
+        if (existingEvent) {
+            throw new ConflictError(`Event with name '${data.name}' and type '${data.type}' already exists`);
+        }
+
         try {
-            // Validation
-            if (!data.name || !data.type || !data.description) {
-                return {
-                    success: false,
-                    error: 'Missing required fields: name, type, and description are required'
-                };
-            }
-
-            // Validate event type
-            if (!Object.values(EventType).includes(data.type as EventType)) {
-                return {
-                    success: false,
-                    error: `Invalid event type. Must be one of: ${Object.values(EventType).join(', ')}`
-                };
-            }
-
-            // check for unique name and type
-            const existingEvent = await prisma.event.findFirst({
-                where: {
-                    name: data.name,
-                    type: data.type,
-                    deletedAt: null
-                }
-            });
-
-            if (existingEvent) {
-                return {
-                    success: false,
-                    error: `Event with name '${data.name}' and type '${data.type}' already exists`
-                };
-            }
-
             const event = await prisma.event.create({
                 data: {
                     name: data.name,
@@ -50,22 +42,14 @@ export class EventService {
                 }
             });
 
-            return {
-                success: true,
-                data: event
-            };
-
+            return event;
         } catch (error) {
             console.error('Error creating event:', error);
-
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to create event');
         }
     }
 
-    static async getAllEvents(): Promise<{ success: boolean; data?: any; error?: string }> {
+    static async getAllEvents(): Promise<any[]> {
         try {
             const events = await prisma.event.findMany({
                 where: {
@@ -76,21 +60,14 @@ export class EventService {
                 }
             });
 
-            return {
-                success: true,
-                data: events
-            };
-
+            return events;
         } catch (error) {
             console.error('Error fetching events:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to fetch events');
         }
     }
 
-    static async getEventById(id: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    static async getEventById(id: string): Promise<any> {
         try {
             const event = await prisma.event.findFirst({
                 where: {
@@ -100,23 +77,13 @@ export class EventService {
             });
 
             if (!event) {
-                return {
-                    success: false,
-                    error: 'Event not found'
-                };
+                throw new NotFoundError('Event not found');
             }
 
-            return {
-                success: true,
-                data: event
-            };
-
+            return event;
         } catch (error) {
             console.error('Error fetching event:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to fetch event');
         }
     }
 } 

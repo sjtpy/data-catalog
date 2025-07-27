@@ -1,4 +1,5 @@
 import { PropertyType } from '../types';
+import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
 import prisma from './prisma';
 
 export class PropertyService {
@@ -6,39 +7,30 @@ export class PropertyService {
         name: string;
         type: string;
         description: string;
-    }): Promise<{ success: boolean; data?: any; error?: string }> {
+    }): Promise<any> {
+        // Validation
+        if (!data.name || !data.type || !data.description) {
+            throw new BadRequestError('Missing required fields: name, type, and description are required');
+        }
+
+        if (!Object.values(PropertyType).includes(data.type as PropertyType)) {
+            throw new BadRequestError(`Invalid property type. Must be one of: ${Object.values(PropertyType).join(', ')}`);
+        }
+
+        // Check for existing property with same name and type
+        const existingProperty = await prisma.property.findFirst({
+            where: {
+                name: data.name,
+                type: data.type,
+                deletedAt: null
+            }
+        });
+
+        if (existingProperty) {
+            throw new ConflictError(`Property with name '${data.name}' and type '${data.type}' already exists`);
+        }
+
         try {
-            // Validation
-            if (!data.name || !data.type || !data.description) {
-                return {
-                    success: false,
-                    error: 'Missing required fields: name, type, and description are required'
-                };
-            }
-
-            if (!Object.values(PropertyType).includes(data.type as PropertyType)) {
-                return {
-                    success: false,
-                    error: `Invalid property type. Must be one of: ${Object.values(PropertyType).join(', ')}`
-                };
-            }
-
-            // Check for existing property with same name and type
-            const existingProperty = await prisma.property.findFirst({
-                where: {
-                    name: data.name,
-                    type: data.type,
-                    deletedAt: null
-                }
-            });
-
-            if (existingProperty) {
-                return {
-                    success: false,
-                    error: `Property with name '${data.name}' and type '${data.type}' already exists`
-                };
-            }
-
             // Create property using Prisma
             const property = await prisma.property.create({
                 data: {
@@ -48,22 +40,14 @@ export class PropertyService {
                 }
             });
 
-            return {
-                success: true,
-                data: property
-            };
-
+            return property;
         } catch (error) {
             console.error('Error creating property:', error);
-
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to create property');
         }
     }
 
-    static async getAllProperties(): Promise<{ success: boolean; data?: any; error?: string }> {
+    static async getAllProperties(): Promise<any[]> {
         try {
             const properties = await prisma.property.findMany({
                 where: {
@@ -74,21 +58,14 @@ export class PropertyService {
                 }
             });
 
-            return {
-                success: true,
-                data: properties
-            };
-
+            return properties;
         } catch (error) {
             console.error('Error fetching properties:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to fetch properties');
         }
     }
 
-    static async getPropertyById(id: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    static async getPropertyById(id: string): Promise<any> {
         try {
             const property = await prisma.property.findFirst({
                 where: {
@@ -98,23 +75,16 @@ export class PropertyService {
             });
 
             if (!property) {
-                return {
-                    success: false,
-                    error: 'Property not found'
-                };
+                throw new NotFoundError('Property not found');
             }
 
-            return {
-                success: true,
-                data: property
-            };
-
+            return property;
         } catch (error) {
+            if (error instanceof HttpError) {
+                throw error;
+            }
             console.error('Error fetching property:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+            throw new InternalServerError('Failed to fetch property');
         }
     }
 } 
