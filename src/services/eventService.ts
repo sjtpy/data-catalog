@@ -25,7 +25,22 @@ export class EventService {
                 };
             }
 
-            // Create event using Prisma
+            // check for unique name and type
+            const existingEvent = await prisma.event.findFirst({
+                where: {
+                    name: data.name,
+                    type: data.type,
+                    deletedAt: null
+                }
+            });
+
+            if (existingEvent) {
+                return {
+                    success: false,
+                    error: `Event with name '${data.name}' and type '${data.type}' already exists`
+                };
+            }
+
             const event = await prisma.event.create({
                 data: {
                     name: data.name,
@@ -42,6 +57,7 @@ export class EventService {
 
         } catch (error) {
             console.error('Error creating event:', error);
+
             return {
                 success: false,
                 error: 'Internal server error'

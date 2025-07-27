@@ -8,7 +8,7 @@ export class PropertyService {
         description: string;
     }): Promise<{ success: boolean; data?: any; error?: string }> {
         try {
-
+            // Validation
             if (!data.name || !data.type || !data.description) {
                 return {
                     success: false,
@@ -23,6 +23,23 @@ export class PropertyService {
                 };
             }
 
+            // Check for existing property with same name and type
+            const existingProperty = await prisma.property.findFirst({
+                where: {
+                    name: data.name,
+                    type: data.type,
+                    deletedAt: null
+                }
+            });
+
+            if (existingProperty) {
+                return {
+                    success: false,
+                    error: `Property with name '${data.name}' and type '${data.type}' already exists`
+                };
+            }
+
+            // Create property using Prisma
             const property = await prisma.property.create({
                 data: {
                     name: data.name,
@@ -38,6 +55,7 @@ export class PropertyService {
 
         } catch (error) {
             console.error('Error creating property:', error);
+
             return {
                 success: false,
                 error: 'Internal server error'
