@@ -1,6 +1,9 @@
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 import eventsRouter from './routes/events';
 import propertiesRouter from './routes/properties';
 import trackingPlansRouter from './routes/trackingPlans';
@@ -8,6 +11,9 @@ import { HttpError } from './utils/exceptions';
 import prisma from './services/prisma';
 
 dotenv.config();
+
+const openApiPath = path.join(process.cwd(), 'openapi.yaml');
+const swaggerDocument = YAML.load(openApiPath);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +26,9 @@ app.use(cors({
 
 // Middleware
 app.use(express.json());
+
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Test Prisma connection
 prisma.$connect()
@@ -55,4 +64,5 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`API Documentation available at: http://localhost:${PORT}/api-docs`);
 }); 

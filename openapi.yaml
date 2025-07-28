@@ -1,0 +1,809 @@
+openapi: 3.0.0
+info:
+  title: Data Catalog API
+  version: 1.0.0
+  description: API documentation for the Data Catalog service
+servers:
+  - url: /api
+paths:
+  /properties:
+    get:
+      summary: Get all properties
+      description: Retrieve a list of all properties
+      tags: [Properties]
+      responses:
+        '200':
+          description: List of properties retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Property'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new property
+      description: Create a new property with the specified name, type, and description
+      tags: [Properties]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type
+                - description
+              properties:
+                name:
+                  type: string
+                  description: Name of the property
+                  example: user_id
+                type:
+                  type: string
+                  enum: [string, number, boolean, object, array]
+                  description: Data type of the property
+                  example: string
+                description:
+                  type: string
+                  description: Description of the property
+                  example: Unique identifier for the user
+      responses:
+        '201':
+          description: Property created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Property'
+                  message:
+                    type: string
+                    example: Property created successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - property already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /properties/{id}:
+    get:
+      summary: Get property by ID
+      description: Retrieve a specific property by its ID
+      tags: [Properties]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Property ID
+      responses:
+        '200':
+          description: Property retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Property'
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update a property
+      description: Update an existing property's name, type, or description
+      tags: [Properties]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Property ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the property
+                  example: user_identifier
+                type:
+                  type: string
+                  enum: [string, number, boolean, object, array]
+                  description: Data type of the property
+                  example: string
+                description:
+                  type: string
+                  description: Description of the property
+                  example: Updated description for user identifier
+      responses:
+        '200':
+          description: Property updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Property'
+                  message:
+                    type: string
+                    example: Property updated successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - property already exists with different description
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a property
+      description: Soft delete a property (marks as deleted but doesn't remove from database)
+      tags: [Properties]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Property ID
+      responses:
+        '200':
+          description: Property deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Property deleted successfully
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events:
+    get:
+      summary: Get all events
+      description: Retrieve a list of all events
+      tags: [Events]
+      responses:
+        '200':
+          description: List of events retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new event
+      description: Create a new event with the specified name, type, description, and properties
+      tags: [Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type
+                - description
+              properties:
+                name:
+                  type: string
+                  description: Name of the event
+                  example: user_signup
+                type:
+                  type: string
+                  enum: [track, identify, alias, screen, page]
+                  description: Type of the event
+                  example: track
+                description:
+                  type: string
+                  description: Description of the event
+                  example: Event triggered when a user signs up
+                properties:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of property IDs associated with this event
+                  example: ["user_id", "email", "signup_date"]
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+                  message:
+                    type: string
+                    example: Event created successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - event already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/{id}:
+    get:
+      summary: Get event by ID
+      description: Retrieve a specific event by its ID
+      tags: [Events]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      responses:
+        '200':
+          description: Event retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update an event
+      description: Update an existing event's name, type, description, or properties
+      tags: [Events]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the event
+                  example: user_registration
+                type:
+                  type: string
+                  enum: [track, identify, alias, screen, page]
+                  description: Type of the event
+                  example: track
+                description:
+                  type: string
+                  description: Description of the event
+                  example: Updated description for user registration event
+                properties:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of property IDs associated with this event
+                  example: ["user_id", "email", "registration_date"]
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+                  message:
+                    type: string
+                    example: Event updated successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - event already exists with different description
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete an event
+      description: Soft delete an event (marks as deleted but doesn't remove from database)
+      tags: [Events]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      responses:
+        '200':
+          description: Event deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Event deleted successfully
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /plans:
+    get:
+      summary: Get all tracking plans
+      description: Retrieve a list of all tracking plans
+      tags: [Tracking Plans]
+      responses:
+        '200':
+          description: List of tracking plans retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrackingPlan'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new tracking plan
+      description: Create a new tracking plan with the specified name, description, and events
+      tags: [Tracking Plans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - description
+              properties:
+                name:
+                  type: string
+                  description: Name of the tracking plan
+                  example: user_onboarding
+                description:
+                  type: string
+                  description: Description of the tracking plan
+                  example: Tracking plan for user onboarding flow
+                events:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of event IDs associated with this tracking plan
+                  example: ["event_1", "event_2", "event_3"]
+      responses:
+        '201':
+          description: Tracking plan created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrackingPlan'
+                  message:
+                    type: string
+                    example: Tracking plan created successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - tracking plan already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /plans/{id}:
+    get:
+      summary: Get tracking plan by ID
+      description: Retrieve a specific tracking plan by its ID
+      tags: [Tracking Plans]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Tracking Plan ID
+      responses:
+        '200':
+          description: Tracking plan retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrackingPlan'
+        '404':
+          description: Tracking plan not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update a tracking plan
+      description: Update an existing tracking plan's name, description, or events
+      tags: [Tracking Plans]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Tracking Plan ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the tracking plan
+                  example: enhanced_user_onboarding
+                description:
+                  type: string
+                  description: Description of the tracking plan
+                  example: Updated tracking plan for enhanced user onboarding flow
+                events:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of event IDs associated with this tracking plan
+                  example: ["event_1", "event_2", "event_3", "event_4"]
+      responses:
+        '200':
+          description: Tracking plan updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrackingPlan'
+                  message:
+                    type: string
+                    example: Tracking plan updated successfully
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tracking plan not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - tracking plan already exists with different description
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a tracking plan
+      description: Soft delete a tracking plan (marks as deleted but doesn't remove from database)
+      tags: [Tracking Plans]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Tracking Plan ID
+      responses:
+        '200':
+          description: Tracking plan deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tracking plan deleted successfully
+        '404':
+          description: Tracking plan not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Property:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "123"
+        name:
+          type: string
+          example: "user_id"
+        type:
+          type: string
+          enum: [string, number, boolean, object, array]
+          example: "string"
+        description:
+          type: string
+          example: "Unique identifier for the user"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "456"
+        name:
+          type: string
+          example: "user_signup"
+        type:
+          type: string
+          enum: [track, identify, alias, screen, page]
+          example: "track"
+        description:
+          type: string
+          example: "Event triggered when a user signs up"
+        propertyIds:
+          type: array
+          items:
+            type: string
+          example: ["user_id", "email", "signup_date"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+    TrackingPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "789"
+        name:
+          type: string
+          example: "user_onboarding"
+        description:
+          type: string
+          example: "Tracking plan for user onboarding flow"
+        eventIds:
+          type: array
+          items:
+            type: string
+          example: ["event_1", "event_2", "event_3"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "An error occurred" 
