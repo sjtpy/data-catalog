@@ -1,8 +1,11 @@
 import { EventType } from '../types';
 import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
-import prisma from './prisma';
+import { EventRepository } from '../repositories/eventRepository';
+import { filterValidPropertyIds, processPropertyData } from '../utils/dataUtils';
 
 export class EventService {
+    private static eventRepository = new EventRepository();
+
     static async createEvent(data: {
         name: string;
         type: string;
@@ -20,13 +23,7 @@ export class EventService {
         }
 
         // Check for unique name and type
-        const existingEvent = await prisma.event.findFirst({
-            where: {
-                name: data.name,
-                type: data.type,
-                deletedAt: null
-            }
-        });
+        const existingEvent = await this.eventRepository.findByNameAndType(data.name, data.type);
 
         if (existingEvent) {
             throw new ConflictError(`Event with name '${data.name}' and type '${data.type}' already exists`);
@@ -34,45 +31,19 @@ export class EventService {
 
         let propertyIds: string[] = [];
         if (data.properties && data.properties.length > 0) {
-            for (const propertyData of data.properties) {
-                if (!propertyData.name || !propertyData.type || !propertyData.description) {
-                    throw new BadRequestError('Property name, type, and description are required');
-                }
-                const existingProperty = await prisma.property.findFirst({
-                    where: {
-                        name: propertyData.name,
-                        type: propertyData.type,
-                        deletedAt: null
-                    }
-                });
-                let propertyId: string;
-                if (existingProperty) {
-                    if (existingProperty.description !== propertyData.description) {
-                        throw new ConflictError(`Property '${propertyData.name}' of type '${propertyData.type}' already exists with a different description`);
-                    }
-                    propertyId = existingProperty.id;
-                } else {
-                    const newProperty = await prisma.property.create({
-                        data: {
-                            name: propertyData.name,
-                            type: propertyData.type,
-                            description: propertyData.description
-                        }
-                    });
-                    propertyId = newProperty.id;
-                }
-                propertyIds.push(propertyId);
+            try {
+                propertyIds = await processPropertyData(data.properties);
+            } catch (error: any) {
+                throw new BadRequestError(error.message);
             }
         }
 
         try {
-            const event = await prisma.event.create({
-                data: {
-                    name: data.name,
-                    type: data.type,
-                    description: data.description,
-                    propertyIds
-                }
+            const event = await this.eventRepository.create({
+                name: data.name,
+                type: data.type,
+                description: data.description,
+                propertyIds
             });
 
             return event;
@@ -89,26 +60,13 @@ export class EventService {
 
     static async getAllEvents(): Promise<any[]> {
         try {
-            const events = await prisma.event.findMany({
-                where: {
-                    deletedAt: null
-                },
-                orderBy: {
-                    createTime: 'desc'
-                }
-            });
+            const events = await this.eventRepository.findAll();
 
             // Filter out deleted property IDs from each event
             const eventsWithValidProperties = await Promise.all(
-                events.map(async (event) => {
+                events.map(async (event: any) => {
                     if (event.propertyIds && event.propertyIds.length > 0) {
-                        const validProperties = await prisma.property.findMany({
-                            where: {
-                                id: { in: event.propertyIds },
-                                deletedAt: null
-                            }
-                        });
-                        const validPropertyIds = validProperties.map(p => p.id);
+                        const validPropertyIds = await filterValidPropertyIds(event.propertyIds);
                         return { ...event, propertyIds: validPropertyIds };
                     }
                     return event;
@@ -116,7 +74,7 @@ export class EventService {
             );
 
             return eventsWithValidProperties;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching events:', error);
             throw new InternalServerError('Failed to fetch events');
         }
@@ -124,12 +82,7 @@ export class EventService {
 
     static async getEventById(id: string): Promise<any> {
         try {
-            const event = await prisma.event.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const event = await this.eventRepository.findById(id);
 
             if (!event) {
                 throw new NotFoundError('Event not found');
@@ -137,22 +90,18 @@ export class EventService {
 
             // Filter out deleted property IDs
             if (event.propertyIds && event.propertyIds.length > 0) {
-                const validProperties = await prisma.property.findMany({
-                    where: {
-                        id: { in: event.propertyIds },
-                        deletedAt: null
-                    }
-                });
-                const validPropertyIds = validProperties.map(p => p.id);
+                const validPropertyIds = await filterValidPropertyIds(event.propertyIds);
                 return { ...event, propertyIds: validPropertyIds };
             }
 
             return event;
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Error fetching event:', error);
+
             if (error instanceof HttpError) {
                 throw error;
             }
-            console.error('Error fetching event:', error);
+
             throw new InternalServerError('Failed to fetch event');
         }
     }
@@ -164,50 +113,33 @@ export class EventService {
         properties?: { name: string; type: string; description: string }[];
     }): Promise<any> {
         try {
-            const existingEvent = await prisma.event.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const existingEvent = await this.eventRepository.findById(id);
 
             if (!existingEvent) {
                 throw new NotFoundError('Event not found');
             }
 
+            // Validate event type if provided
             if (data.type && !Object.values(EventType).includes(data.type as EventType)) {
                 throw new BadRequestError(`Invalid event type. Must be one of: ${Object.values(EventType).join(', ')}`);
             }
 
-            // check for unique name and type combination
+            // Check for unique name and type combination if name or type is being updated
             if (data.name || data.type) {
                 const newName = data.name || existingEvent.name;
                 const newType = data.type || existingEvent.type;
 
-                const duplicateEvent = await prisma.event.findFirst({
-                    where: {
-                        name: newName,
-                        type: newType,
-                        deletedAt: null,
-                        id: { not: id }
-                    }
-                });
+                const duplicateEvent = await this.eventRepository.findByNameAndType(newName, newType);
 
-                if (duplicateEvent) {
+                if (duplicateEvent && duplicateEvent.id !== id) {
                     throw new ConflictError(`Event with name '${newName}' and type '${newType}' already exists`);
                 }
             }
 
             let propertyIds: string[] = existingEvent.propertyIds || [];
-
+            // Filter out deleted property IDs from existing properties
             if (propertyIds.length > 0) {
-                const validProperties = await prisma.property.findMany({
-                    where: {
-                        id: { in: propertyIds },
-                        deletedAt: null
-                    }
-                });
-                propertyIds = validProperties.map(p => p.id);
+                propertyIds = await filterValidPropertyIds(propertyIds);
             }
 
             if (data.properties && data.properties.length > 0) {
@@ -216,13 +148,7 @@ export class EventService {
                     if (!propertyData.name || !propertyData.type || !propertyData.description) {
                         throw new BadRequestError('Property name, type, and description are required');
                     }
-                    const existingProperty = await prisma.property.findFirst({
-                        where: {
-                            name: propertyData.name,
-                            type: propertyData.type,
-                            deletedAt: null
-                        }
-                    });
+                    const existingProperty = await this.eventRepository.findPropertyByNameAndType(propertyData.name, propertyData.type);
                     let propertyId: string;
                     if (existingProperty) {
                         if (existingProperty.description !== propertyData.description) {
@@ -230,33 +156,27 @@ export class EventService {
                         }
                         propertyId = existingProperty.id;
                     } else {
-                        const newProperty = await prisma.property.create({
-                            data: {
-                                name: propertyData.name,
-                                type: propertyData.type,
-                                description: propertyData.description
-                            }
+                        const newProperty = await this.eventRepository.createProperty({
+                            name: propertyData.name,
+                            type: propertyData.type,
+                            description: propertyData.description
                         });
                         propertyId = newProperty.id;
                     }
                     newPropertyIds.push(propertyId);
                 }
-                // Merge and deduplicate
+                // Merge and deduplicate for additive update
                 propertyIds = Array.from(new Set([...propertyIds, ...newPropertyIds]));
             }
 
-            const updatedEvent = await prisma.event.update({
-                where: { id },
-                data: {
-                    ...(data.name && { name: data.name }),
-                    ...(data.type && { type: data.type }),
-                    ...(data.description && { description: data.description }),
-                    propertyIds
-                }
+            const updatedEvent = await this.eventRepository.update(id, {
+                ...(data.name && { name: data.name }),
+                ...(data.type && { type: data.type }),
+                ...(data.description && { description: data.description }),
+                propertyIds
             });
 
             return updatedEvent;
-
         } catch (error: any) {
             console.error('Error updating event:', error);
 
@@ -270,26 +190,15 @@ export class EventService {
 
     static async deleteEvent(id: string): Promise<{ success: boolean }> {
         try {
-            const existingEvent = await prisma.event.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const existingEvent = await this.eventRepository.findById(id);
 
             if (!existingEvent) {
                 throw new NotFoundError('Event not found');
             }
 
-            await prisma.event.update({
-                where: { id },
-                data: {
-                    deletedAt: new Date()
-                }
-            });
+            await this.eventRepository.softDelete(id);
 
             return { success: true };
-
         } catch (error: any) {
             console.error('Error deleting event:', error);
 
