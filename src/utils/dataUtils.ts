@@ -1,8 +1,6 @@
 import prisma from '../services/prisma';
 
-/**
- * Filters out deleted property IDs from an array of property IDs
- */
+
 export async function filterValidPropertyIds(propertyIds: string[]): Promise<string[]> {
     if (!propertyIds || propertyIds.length === 0) {
         return [];
@@ -18,9 +16,23 @@ export async function filterValidPropertyIds(propertyIds: string[]): Promise<str
     return validProperties.map(p => p.id);
 }
 
-/**
- * Processes property data and returns property IDs, creating properties if they don't exist
- */
+
+export async function filterValidEventIds(eventIds: string[]): Promise<string[]> {
+    if (!eventIds || eventIds.length === 0) {
+        return [];
+    }
+
+    const validEvents = await prisma.event.findMany({
+        where: {
+            id: { in: eventIds },
+            deletedAt: null
+        }
+    });
+
+    return validEvents.map(e => e.id);
+}
+
+
 export async function processPropertyData(properties: { name: string; type: string; description: string }[]): Promise<string[]> {
     const propertyIds: string[] = [];
 
@@ -57,4 +69,50 @@ export async function processPropertyData(properties: { name: string; type: stri
     }
 
     return propertyIds;
+}
+
+
+export async function processEventData(events: { name: string; type: string; description: string; properties?: { name: string; type: string; description: string }[] }[]): Promise<string[]> {
+    const eventIds: string[] = [];
+
+    for (const eventData of events) {
+        if (!eventData.name || !eventData.type || !eventData.description) {
+            throw new Error('Event name, type, and description are required');
+        }
+
+        const existingEvent = await prisma.event.findFirst({
+            where: {
+                name: eventData.name,
+                type: eventData.type,
+                deletedAt: null
+            }
+        });
+
+        let eventId: string;
+        if (existingEvent) {
+            if (existingEvent.description !== eventData.description) {
+                throw new Error(`Event '${eventData.name}' already exists with a different description`);
+            }
+            eventId = existingEvent.id;
+        } else {
+            // Process properties for new event
+            let propertyIds: string[] = [];
+            if (eventData.properties && eventData.properties.length > 0) {
+                propertyIds = await processPropertyData(eventData.properties);
+            }
+
+            const newEvent = await prisma.event.create({
+                data: {
+                    name: eventData.name,
+                    type: eventData.type,
+                    description: eventData.description,
+                    propertyIds
+                }
+            });
+            eventId = newEvent.id;
+        }
+        eventIds.push(eventId);
+    }
+
+    return eventIds;
 } 

@@ -1,8 +1,10 @@
 import { PropertyType } from '../types';
 import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
-import prisma from './prisma';
+import { PropertyRepository } from '../repositories/propertyRepository';
 
 export class PropertyService {
+    private static propertyRepository = new PropertyRepository();
+
     static async createProperty(data: {
         name: string;
         type: string;
@@ -18,26 +20,17 @@ export class PropertyService {
         }
 
         // Check for existing property with same name and type
-        const existingProperty = await prisma.property.findFirst({
-            where: {
-                name: data.name,
-                type: data.type,
-                deletedAt: null
-            }
-        });
+        const existingProperty = await this.propertyRepository.findByNameAndType(data.name, data.type);
 
         if (existingProperty) {
             throw new ConflictError(`Property with name '${data.name}' and type '${data.type}' already exists`);
         }
 
         try {
-            // Create property using Prisma
-            const property = await prisma.property.create({
-                data: {
-                    name: data.name,
-                    type: data.type,
-                    description: data.description
-                }
+            const property = await this.propertyRepository.create({
+                name: data.name,
+                type: data.type,
+                description: data.description
             });
 
             return property;
@@ -53,17 +46,9 @@ export class PropertyService {
 
     static async getAllProperties(): Promise<any[]> {
         try {
-            const properties = await prisma.property.findMany({
-                where: {
-                    deletedAt: null
-                },
-                orderBy: {
-                    createTime: 'desc'
-                }
-            });
-
+            const properties = await this.propertyRepository.findAll();
             return properties;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching properties:', error);
             throw new InternalServerError('Failed to fetch properties');
         }
@@ -71,19 +56,14 @@ export class PropertyService {
 
     static async getPropertyById(id: string): Promise<any> {
         try {
-            const property = await prisma.property.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const property = await this.propertyRepository.findById(id);
 
             if (!property) {
                 throw new NotFoundError('Property not found');
             }
 
             return property;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof HttpError) {
                 throw error;
             }
@@ -99,12 +79,7 @@ export class PropertyService {
     }): Promise<any> {
         try {
             // check existence
-            const existingProperty = await prisma.property.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const existingProperty = await this.propertyRepository.findById(id);
 
             if (!existingProperty) {
                 throw new NotFoundError('Property not found');
@@ -119,27 +94,17 @@ export class PropertyService {
                 const newName = data.name || existingProperty.name;
                 const newType = data.type || existingProperty.type;
 
-                const duplicateProperty = await prisma.property.findFirst({
-                    where: {
-                        name: newName,
-                        type: newType,
-                        deletedAt: null,
-                        id: { not: id }
-                    }
-                });
+                const duplicateProperty = await this.propertyRepository.findByNameAndType(newName, newType);
 
-                if (duplicateProperty) {
+                if (duplicateProperty && duplicateProperty.id !== id) {
                     throw new ConflictError(`Property with name '${newName}' and type '${newType}' already exists`);
                 }
             }
 
-            const updatedProperty = await prisma.property.update({
-                where: { id },
-                data: {
-                    ...(data.name && { name: data.name }),
-                    ...(data.type && { type: data.type }),
-                    ...(data.description && { description: data.description })
-                }
+            const updatedProperty = await this.propertyRepository.update(id, {
+                ...(data.name && { name: data.name }),
+                ...(data.type && { type: data.type }),
+                ...(data.description && { description: data.description })
             });
 
             return updatedProperty;
@@ -157,23 +122,13 @@ export class PropertyService {
 
     static async deleteProperty(id: string): Promise<{ success: boolean }> {
         try {
-            const existingProperty = await prisma.property.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
+            const existingProperty = await this.propertyRepository.findById(id);
 
             if (!existingProperty) {
                 throw new NotFoundError('Property not found');
             }
 
-            await prisma.property.update({
-                where: { id },
-                data: {
-                    deletedAt: new Date()
-                }
-            });
+            await this.propertyRepository.softDelete(id);
 
             return { success: true };
 
