@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import eventsRouter from './routes/events';
 import propertiesRouter from './routes/properties';
@@ -10,6 +11,12 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// CORS middleware
+app.use(cors({
+    origin: 'http://localhost:3001',
+    credentials: true
+}));
 
 // Middleware
 app.use(express.json());
