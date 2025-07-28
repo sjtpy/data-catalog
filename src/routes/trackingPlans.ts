@@ -52,47 +52,39 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name, description, eventIds } = req.body;
+router.put('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, description, events } = req.body;
 
-    const result = await TrackingPlanService.updateTrackingPlan(id, {
-        name,
-        description,
-        eventIds
-    });
+        const updatedTrackingPlan = await TrackingPlanService.updateTrackingPlan(id, {
+            name,
+            description,
+            events
+        });
 
-    if (result.success) {
         res.json({
             success: true,
-            data: result.data,
+            data: updatedTrackingPlan,
             message: 'Tracking plan updated successfully'
         } as ApiResponse);
-    } else {
-        const statusCode = result.error === 'Tracking plan not found' ? 404 : 400;
-        res.status(statusCode).json({
-            success: false,
-            error: result.error
-        } as ApiResponse);
+    } catch (error) {
+        next(error);
     }
 });
 
-router.delete('/:id', async (req, res) => {
-    const { id } = req.params;
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
 
-    const result = await TrackingPlanService.deleteTrackingPlan(id);
+        await TrackingPlanService.deleteTrackingPlan(id);
 
-    if (result.success) {
         res.json({
             success: true,
             message: 'Tracking plan deleted successfully'
         } as ApiResponse);
-    } else {
-        const statusCode = result.error === 'Tracking plan not found' ? 404 : 500;
-        res.status(statusCode).json({
-            success: false,
-            error: result.error
-        } as ApiResponse);
+    } catch (error) {
+        next(error);
     }
 });
 

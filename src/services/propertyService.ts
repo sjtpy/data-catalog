@@ -41,8 +41,12 @@ export class PropertyService {
             });
 
             return property;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating property:', error);
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
             throw new InternalServerError('Failed to create property');
         }
     }
@@ -85,6 +89,69 @@ export class PropertyService {
             }
             console.error('Error fetching property:', error);
             throw new InternalServerError('Failed to fetch property');
+        }
+    }
+
+    static async updateProperty(id: string, data: {
+        name?: string;
+        type?: string;
+        description?: string;
+    }): Promise<any> {
+        try {
+            // check existence
+            const existingProperty = await prisma.property.findFirst({
+                where: {
+                    id,
+                    deletedAt: null
+                }
+            });
+
+            if (!existingProperty) {
+                throw new NotFoundError('Property not found');
+            }
+
+            if (data.type && !Object.values(PropertyType).includes(data.type as PropertyType)) {
+                throw new BadRequestError(`Invalid property type. Must be one of: ${Object.values(PropertyType).join(', ')}`);
+            }
+
+            // Check for unique name and type combination if name or type is being updated
+            if (data.name || data.type) {
+                const newName = data.name || existingProperty.name;
+                const newType = data.type || existingProperty.type;
+
+                const duplicateProperty = await prisma.property.findFirst({
+                    where: {
+                        name: newName,
+                        type: newType,
+                        deletedAt: null,
+                        id: { not: id }
+                    }
+                });
+
+                if (duplicateProperty) {
+                    throw new ConflictError(`Property with name '${newName}' and type '${newType}' already exists`);
+                }
+            }
+
+            const updatedProperty = await prisma.property.update({
+                where: { id },
+                data: {
+                    ...(data.name && { name: data.name }),
+                    ...(data.type && { type: data.type }),
+                    ...(data.description && { description: data.description })
+                }
+            });
+
+            return updatedProperty;
+
+        } catch (error: any) {
+            console.error('Error updating property:', error);
+
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
+            throw new InternalServerError('Failed to update property');
         }
     }
 } 

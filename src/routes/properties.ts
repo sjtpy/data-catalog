@@ -52,4 +52,25 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
+router.put('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, type, description } = req.body;
+
+        const updatedProperty = await PropertyService.updateProperty(id, {
+            name,
+            type,
+            description
+        });
+
+        res.json({
+            success: true,
+            data: updatedProperty,
+            message: 'Property updated successfully'
+        } as ApiResponse);
+    } catch (error) {
+        next(error);
+    }
+});
+
 export default router; 

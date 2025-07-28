@@ -54,4 +54,26 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
+router.put('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, type, description, propertyIds } = req.body;
+
+        const updatedEvent = await EventService.updateEvent(id, {
+            name,
+            type,
+            description,
+            propertyIds
+        });
+
+        res.json({
+            success: true,
+            data: updatedEvent,
+            message: 'Event updated successfully'
+        } as ApiResponse);
+    } catch (error) {
+        next(error);
+    }
+});
+
 export default router; 

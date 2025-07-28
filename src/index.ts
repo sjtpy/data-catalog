@@ -26,7 +26,7 @@ app.get('/ping', (req, res) => {
 
 app.use('/api/events', eventsRouter);
 app.use('/api/properties', propertiesRouter);
-app.use('/api/tracking-plans', trackingPlansRouter);
+app.use('/api/plans', trackingPlansRouter);
 
 // Global error handler middleware
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

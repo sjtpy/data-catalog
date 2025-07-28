@@ -126,8 +126,13 @@ export class TrackingPlanService {
             });
 
             return trackingPlan;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating tracking plan:', error);
+
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
             throw new InternalServerError('Failed to create tracking plan');
         }
     }
@@ -164,8 +169,11 @@ export class TrackingPlanService {
             }
 
             return trackingPlan;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching tracking plan:', error);
+            if (error instanceof HttpError) {
+                throw error;
+            }
             throw new InternalServerError('Failed to fetch tracking plan');
         }
     }
@@ -173,10 +181,10 @@ export class TrackingPlanService {
     static async updateTrackingPlan(id: string, data: {
         name?: string;
         description?: string;
-        eventIds?: string[];
-    }): Promise<{ success: boolean; data?: any; error?: string }> {
+        events?: TrackingPlanEventData[];
+    }): Promise<any> {
         try {
-            // Check if tracking plan exists
+            // check existence
             const existingTrackingPlan = await prisma.trackingPlan.findFirst({
                 where: {
                     id,
@@ -185,13 +193,10 @@ export class TrackingPlanService {
             });
 
             if (!existingTrackingPlan) {
-                return {
-                    success: false,
-                    error: 'Tracking plan not found'
-                };
+                throw new NotFoundError('Tracking plan not found');
             }
 
-            // Check for unique name if name is being updated
+            // Check for unique name
             if (data.name && data.name !== existingTrackingPlan.name) {
                 const duplicateName = await prisma.trackingPlan.findFirst({
                     where: {
@@ -202,28 +207,115 @@ export class TrackingPlanService {
                 });
 
                 if (duplicateName) {
-                    return {
-                        success: false,
-                        error: `Tracking plan with name '${data.name}' already exists`
-                    };
+                    throw new ConflictError(`Tracking plan with name '${data.name}' already exists`);
                 }
             }
 
-            // Validate event IDs if provided
-            if (data.eventIds && data.eventIds.length > 0) {
-                const validEvents = await prisma.event.findMany({
+            let eventIds: string[] = existingTrackingPlan.eventIds;
+
+            // Process events only if provided (partial update, append/merge)
+            if (data.events && data.events.length > 0) {
+                // Fetch all existing events for this tracking plan
+                const existingEvents = await prisma.event.findMany({
                     where: {
-                        id: { in: data.eventIds },
+                        id: { in: existingTrackingPlan.eventIds },
                         deletedAt: null
                     }
                 });
 
-                if (validEvents.length !== data.eventIds.length) {
-                    return {
-                        success: false,
-                        error: 'One or more event IDs are invalid'
-                    };
+                // Build a map for quick lookup: key = name+type
+                const eventKey = (e: { name: string; type: string }) => `${e.name}::${e.type}`;
+                const existingEventMap = new Map<string, any>(existingEvents.map((e: any) => [eventKey(e), e]));
+                const newEventIds: string[] = [...eventIds];
+
+                for (const eventData of data.events) {
+                    if (!eventData.name || !eventData.description) {
+                        throw new BadRequestError('Event name and description are required');
+                    }
+                    const key = eventKey(eventData);
+                    let eventId: string;
+
+                    if (existingEventMap.has(key)) {
+                        // Event exists, update description if needed
+                        const existingEvent = existingEventMap.get(key)!;
+                        if (existingEvent.description !== eventData.description) {
+                            await prisma.event.update({
+                                where: { id: existingEvent.id },
+                                data: { description: eventData.description }
+                            });
+                        }
+                        eventId = existingEvent.id;
+                    } else {
+                        // Check if event exists globally (not in this plan)
+                        const globalEvent = await prisma.event.findFirst({
+                            where: {
+                                name: eventData.name,
+                                type: eventData.type,
+                                deletedAt: null
+                            }
+                        });
+                        if (globalEvent) {
+                            if (globalEvent.description !== eventData.description) {
+                                throw new ConflictError(`Event '${eventData.name}' already exists with a different description`);
+                            }
+                            eventId = globalEvent.id;
+                        } else {
+                            // Create new event
+                            const newEvent = await prisma.event.create({
+                                data: {
+                                    name: eventData.name,
+                                    type: eventData.type,
+                                    description: eventData.description,
+                                    propertyIds: []
+                                }
+                            });
+                            eventId = newEvent.id;
+                        }
+                        newEventIds.push(eventId);
+                    }
+
+                    // Process properties for this event
+                    if (eventData.properties && eventData.properties.length > 0) {
+                        const propertyIds: string[] = [];
+                        for (const propertyData of eventData.properties) {
+                            if (!propertyData.name || !propertyData.type || !propertyData.description) {
+                                throw new BadRequestError(`Property name, type, and description are required for event '${eventData.name}'`);
+                            }
+                            // Check if property already exists
+                            const existingProperty = await prisma.property.findFirst({
+                                where: {
+                                    name: propertyData.name,
+                                    type: propertyData.type,
+                                    deletedAt: null
+                                }
+                            });
+                            let propertyId: string;
+                            if (existingProperty) {
+                                if (existingProperty.description !== propertyData.description) {
+                                    throw new ConflictError(`Property '${propertyData.name}' of type '${propertyData.type}' already exists with a different description`);
+                                }
+                                propertyId = existingProperty.id;
+                            } else {
+                                const newProperty = await prisma.property.create({
+                                    data: {
+                                        name: propertyData.name,
+                                        type: propertyData.type,
+                                        description: propertyData.description
+                                    }
+                                });
+                                propertyId = newProperty.id;
+                            }
+                            propertyIds.push(propertyId);
+                        }
+                        // Update event with property IDs
+                        await prisma.event.update({
+                            where: { id: eventId },
+                            data: { propertyIds }
+                        });
+                    }
                 }
+                // Remove duplicates
+                eventIds = Array.from(new Set(newEventIds));
             }
 
             const updatedTrackingPlan = await prisma.trackingPlan.update({
@@ -231,25 +323,25 @@ export class TrackingPlanService {
                 data: {
                     ...(data.name && { name: data.name }),
                     ...(data.description && { description: data.description }),
-                    ...(data.eventIds && { eventIds: data.eventIds })
+                    ...(data.events && { eventIds })
                 }
             });
 
-            return {
-                success: true,
-                data: updatedTrackingPlan
-            };
+            return updatedTrackingPlan;
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error updating tracking plan:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+
+            // If it's already an HttpError, re-throw it
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
+            throw new InternalServerError('Failed to update tracking plan');
         }
     }
 
-    static async deleteTrackingPlan(id: string): Promise<{ success: boolean; error?: string }> {
+    static async deleteTrackingPlan(id: string): Promise<{ success: boolean }> {
         try {
             const existingTrackingPlan = await prisma.trackingPlan.findFirst({
                 where: {
@@ -259,10 +351,7 @@ export class TrackingPlanService {
             });
 
             if (!existingTrackingPlan) {
-                return {
-                    success: false,
-                    error: 'Tracking plan not found'
-                };
+                throw new NotFoundError('Tracking plan not found');
             }
 
             await prisma.trackingPlan.update({
@@ -272,16 +361,17 @@ export class TrackingPlanService {
                 }
             });
 
-            return {
-                success: true
-            };
+            return { success: true };
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error deleting tracking plan:', error);
-            return {
-                success: false,
-                error: 'Internal server error'
-            };
+
+            // If it's already an HttpError, re-throw it
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
+            throw new InternalServerError('Failed to delete tracking plan');
         }
     }
 }
