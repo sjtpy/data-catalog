@@ -90,5 +90,100 @@ describe('PropertyService', () => {
             expect(result).toBeInstanceOf(Object);
             expect(result.name).toBe('user_id');
         });
+
+        it('should throw BadRequestError for missing required fields', async () => {
+            const invalidData = {
+                name: 'user_id',
+                // missing type and description
+            };
+
+            await expect(PropertyService.createProperty(invalidData as any)).rejects.toThrow('Missing required fields');
+        });
+
+        it('should throw BadRequestError for invalid property type', async () => {
+            const invalidData = {
+                name: 'user_id',
+                type: 'invalid_type',
+                description: 'User ID',
+            };
+
+            await expect(PropertyService.createProperty(invalidData)).rejects.toThrow('Invalid property type');
+        });
+
+        it('should throw ConflictError when property with same name and type exists', async () => {
+            const propertyData = {
+                name: 'user_id',
+                type: 'string',
+                description: 'User ID',
+            };
+
+            mockPrisma.property.findFirst.mockResolvedValue({ id: 'existing' });
+
+            await expect(PropertyService.createProperty(propertyData)).rejects.toThrow('already exists');
+        });
+    });
+
+    describe('updateProperty', () => {
+        it('should update an existing property', async () => {
+            const updateData = {
+                name: 'user_identifier',
+                type: 'string',
+                description: 'Updated description',
+            };
+
+            const mockUpdatedProperty = {
+                id: '1',
+                ...updateData,
+                createTime: new Date(),
+                updateTime: new Date(),
+            };
+
+            mockPrisma.property.findFirst.mockResolvedValue({ id: '1' });
+            mockPrisma.property.update.mockResolvedValue(mockUpdatedProperty);
+
+            const result = await PropertyService.updateProperty('1', updateData);
+
+            expect(result).toBeInstanceOf(Object);
+            expect(result.name).toBe('user_identifier');
+        });
+
+        it('should throw NotFoundError when property not found', async () => {
+            const updateData = {
+                name: 'user_identifier',
+                type: 'string',
+                description: 'Updated description',
+            };
+
+            mockPrisma.property.findFirst.mockResolvedValue(null);
+
+            await expect(PropertyService.updateProperty('999', updateData)).rejects.toThrow(NotFoundError);
+        });
+    });
+
+    describe('deleteProperty', () => {
+        it('should soft delete a property', async () => {
+            const mockProperty = {
+                id: '1',
+                name: 'user_id',
+                type: 'string',
+                description: 'User ID',
+                deletedAt: new Date(),
+                createTime: new Date(),
+                updateTime: new Date(),
+            };
+
+            mockPrisma.property.findFirst.mockResolvedValue({ id: '1' });
+            mockPrisma.property.update.mockResolvedValue(mockProperty);
+
+            const result = await PropertyService.deleteProperty('1');
+
+            expect(result.success).toBe(true);
+        });
+
+        it('should throw NotFoundError when property not found', async () => {
+            mockPrisma.property.findFirst.mockResolvedValue(null);
+
+            await expect(PropertyService.deleteProperty('999')).rejects.toThrow(NotFoundError);
+        });
     });
 }); 
