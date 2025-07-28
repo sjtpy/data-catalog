@@ -148,7 +148,41 @@ export class TrackingPlanService {
                 }
             });
 
-            return trackingPlans;
+            // Filter out deleted event IDs and their deleted property IDs from each tracking plan
+            const trackingPlansWithValidData = await Promise.all(
+                trackingPlans.map(async (trackingPlan) => {
+                    if (trackingPlan.eventIds && trackingPlan.eventIds.length > 0) {
+                        const events = await prisma.event.findMany({
+                            where: {
+                                id: { in: trackingPlan.eventIds },
+                                deletedAt: null
+                            }
+                        });
+
+                        const eventsWithValidProperties = await Promise.all(
+                            events.map(async (event) => {
+                                if (event.propertyIds && event.propertyIds.length > 0) {
+                                    const validProperties = await prisma.property.findMany({
+                                        where: {
+                                            id: { in: event.propertyIds },
+                                            deletedAt: null
+                                        }
+                                    });
+                                    const validPropertyIds = validProperties.map(p => p.id);
+                                    return { ...event, propertyIds: validPropertyIds };
+                                }
+                                return event;
+                            })
+                        );
+
+                        const validEventIds = eventsWithValidProperties.map(e => e.id);
+                        return { ...trackingPlan, eventIds: validEventIds };
+                    }
+                    return trackingPlan;
+                })
+            );
+
+            return trackingPlansWithValidData;
         } catch (error) {
             console.error('Error fetching tracking plans:', error);
             throw new InternalServerError('Failed to fetch tracking plans');
@@ -166,6 +200,35 @@ export class TrackingPlanService {
 
             if (!trackingPlan) {
                 throw new NotFoundError('Tracking plan not found');
+            }
+
+            // Filter out deleted event IDs and their deleted property IDs from the tracking plan
+            if (trackingPlan.eventIds && trackingPlan.eventIds.length > 0) {
+                const events = await prisma.event.findMany({
+                    where: {
+                        id: { in: trackingPlan.eventIds },
+                        deletedAt: null
+                    }
+                });
+
+                const eventsWithValidProperties = await Promise.all(
+                    events.map(async (event) => {
+                        if (event.propertyIds && event.propertyIds.length > 0) {
+                            const validProperties = await prisma.property.findMany({
+                                where: {
+                                    id: { in: event.propertyIds },
+                                    deletedAt: null
+                                }
+                            });
+                            const validPropertyIds = validProperties.map(p => p.id);
+                            return { ...event, propertyIds: validPropertyIds };
+                        }
+                        return event;
+                    })
+                );
+
+                const validEventIds = eventsWithValidProperties.map(e => e.id);
+                return { ...trackingPlan, eventIds: validEventIds };
             }
 
             return trackingPlan;
@@ -213,17 +276,26 @@ export class TrackingPlanService {
 
             let eventIds: string[] = existingTrackingPlan.eventIds;
 
-            // Process events only if provided (partial update, append/merge)
+            // Filter out deleted event IDs from existing events
+            if (eventIds.length > 0) {
+                const validEvents = await prisma.event.findMany({
+                    where: {
+                        id: { in: eventIds },
+                        deletedAt: null
+                    }
+                });
+                eventIds = validEvents.map(e => e.id);
+            }
+
             if (data.events && data.events.length > 0) {
-                // Fetch all existing events for this tracking plan
+                // Fetch all existing events for this tracking plan (using filtered eventIds)
                 const existingEvents = await prisma.event.findMany({
                     where: {
-                        id: { in: existingTrackingPlan.eventIds },
+                        id: { in: eventIds },
                         deletedAt: null
                     }
                 });
 
-                // Build a map for quick lookup: key = name+type
                 const eventKey = (e: { name: string; type: string }) => `${e.name}::${e.type}`;
                 const existingEventMap = new Map<string, any>(existingEvents.map((e: any) => [eventKey(e), e]));
                 const newEventIds: string[] = [...eventIds];
@@ -260,7 +332,7 @@ export class TrackingPlanService {
                             }
                             eventId = globalEvent.id;
                         } else {
-                            // Create new event
+
                             const newEvent = await prisma.event.create({
                                 data: {
                                     name: eventData.name,
@@ -274,14 +346,14 @@ export class TrackingPlanService {
                         newEventIds.push(eventId);
                     }
 
-                    // Process properties for this event
+
                     if (eventData.properties && eventData.properties.length > 0) {
                         const propertyIds: string[] = [];
                         for (const propertyData of eventData.properties) {
                             if (!propertyData.name || !propertyData.type || !propertyData.description) {
                                 throw new BadRequestError(`Property name, type, and description are required for event '${eventData.name}'`);
                             }
-                            // Check if property already exists
+
                             const existingProperty = await prisma.property.findFirst({
                                 where: {
                                     name: propertyData.name,
@@ -307,14 +379,14 @@ export class TrackingPlanService {
                             }
                             propertyIds.push(propertyId);
                         }
-                        // Update event with property IDs
+
                         await prisma.event.update({
                             where: { id: eventId },
                             data: { propertyIds }
                         });
                     }
                 }
-                // Remove duplicates
+
                 eventIds = Array.from(new Set(newEventIds));
             }
 
@@ -332,7 +404,6 @@ export class TrackingPlanService {
         } catch (error: any) {
             console.error('Error updating tracking plan:', error);
 
-            // If it's already an HttpError, re-throw it
             if (error instanceof HttpError) {
                 throw error;
             }

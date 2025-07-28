@@ -154,4 +154,37 @@ export class PropertyService {
             throw new InternalServerError('Failed to update property');
         }
     }
+
+    static async deleteProperty(id: string): Promise<{ success: boolean }> {
+        try {
+            const existingProperty = await prisma.property.findFirst({
+                where: {
+                    id,
+                    deletedAt: null
+                }
+            });
+
+            if (!existingProperty) {
+                throw new NotFoundError('Property not found');
+            }
+
+            await prisma.property.update({
+                where: { id },
+                data: {
+                    deletedAt: new Date()
+                }
+            });
+
+            return { success: true };
+
+        } catch (error: any) {
+            console.error('Error deleting property:', error);
+
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
+            throw new InternalServerError('Failed to delete property');
+        }
+    }
 } 

@@ -98,7 +98,24 @@ export class EventService {
                 }
             });
 
-            return events;
+            // Filter out deleted property IDs from each event
+            const eventsWithValidProperties = await Promise.all(
+                events.map(async (event) => {
+                    if (event.propertyIds && event.propertyIds.length > 0) {
+                        const validProperties = await prisma.property.findMany({
+                            where: {
+                                id: { in: event.propertyIds },
+                                deletedAt: null
+                            }
+                        });
+                        const validPropertyIds = validProperties.map(p => p.id);
+                        return { ...event, propertyIds: validPropertyIds };
+                    }
+                    return event;
+                })
+            );
+
+            return eventsWithValidProperties;
         } catch (error) {
             console.error('Error fetching events:', error);
             throw new InternalServerError('Failed to fetch events');
@@ -116,6 +133,18 @@ export class EventService {
 
             if (!event) {
                 throw new NotFoundError('Event not found');
+            }
+
+            // Filter out deleted property IDs
+            if (event.propertyIds && event.propertyIds.length > 0) {
+                const validProperties = await prisma.property.findMany({
+                    where: {
+                        id: { in: event.propertyIds },
+                        deletedAt: null
+                    }
+                });
+                const validPropertyIds = validProperties.map(p => p.id);
+                return { ...event, propertyIds: validPropertyIds };
             }
 
             return event;
@@ -170,6 +199,17 @@ export class EventService {
             }
 
             let propertyIds: string[] = existingEvent.propertyIds || [];
+
+            if (propertyIds.length > 0) {
+                const validProperties = await prisma.property.findMany({
+                    where: {
+                        id: { in: propertyIds },
+                        deletedAt: null
+                    }
+                });
+                propertyIds = validProperties.map(p => p.id);
+            }
+
             if (data.properties && data.properties.length > 0) {
                 const newPropertyIds: string[] = [];
                 for (const propertyData of data.properties) {
@@ -225,6 +265,39 @@ export class EventService {
             }
 
             throw new InternalServerError('Failed to update event');
+        }
+    }
+
+    static async deleteEvent(id: string): Promise<{ success: boolean }> {
+        try {
+            const existingEvent = await prisma.event.findFirst({
+                where: {
+                    id,
+                    deletedAt: null
+                }
+            });
+
+            if (!existingEvent) {
+                throw new NotFoundError('Event not found');
+            }
+
+            await prisma.event.update({
+                where: { id },
+                data: {
+                    deletedAt: new Date()
+                }
+            });
+
+            return { success: true };
+
+        } catch (error: any) {
+            console.error('Error deleting event:', error);
+
+            if (error instanceof HttpError) {
+                throw error;
+            }
+
+            throw new InternalServerError('Failed to delete event');
         }
     }
 } 

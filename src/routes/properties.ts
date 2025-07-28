@@ -73,4 +73,19 @@ router.put('/:id', async (req, res, next) => {
     }
 });
 
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        await PropertyService.deleteProperty(id);
+
+        res.json({
+            success: true,
+            message: 'Property deleted successfully'
+        } as ApiResponse);
+    } catch (error) {
+        next(error);
+    }
+});
+
 export default router; 
