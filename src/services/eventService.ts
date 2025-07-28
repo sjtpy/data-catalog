@@ -7,7 +7,7 @@ export class EventService {
         name: string;
         type: string;
         description: string;
-        propertyIds?: string[];
+        properties?: { name: string; type: string; description: string }[];
     }): Promise<any> {
         // existence validation
         if (!data.name || !data.type || !data.description) {
@@ -32,13 +32,46 @@ export class EventService {
             throw new ConflictError(`Event with name '${data.name}' and type '${data.type}' already exists`);
         }
 
+        let propertyIds: string[] = [];
+        if (data.properties && data.properties.length > 0) {
+            for (const propertyData of data.properties) {
+                if (!propertyData.name || !propertyData.type || !propertyData.description) {
+                    throw new BadRequestError('Property name, type, and description are required');
+                }
+                const existingProperty = await prisma.property.findFirst({
+                    where: {
+                        name: propertyData.name,
+                        type: propertyData.type,
+                        deletedAt: null
+                    }
+                });
+                let propertyId: string;
+                if (existingProperty) {
+                    if (existingProperty.description !== propertyData.description) {
+                        throw new ConflictError(`Property '${propertyData.name}' of type '${propertyData.type}' already exists with a different description`);
+                    }
+                    propertyId = existingProperty.id;
+                } else {
+                    const newProperty = await prisma.property.create({
+                        data: {
+                            name: propertyData.name,
+                            type: propertyData.type,
+                            description: propertyData.description
+                        }
+                    });
+                    propertyId = newProperty.id;
+                }
+                propertyIds.push(propertyId);
+            }
+        }
+
         try {
             const event = await prisma.event.create({
                 data: {
                     name: data.name,
                     type: data.type,
                     description: data.description,
-                    propertyIds: data.propertyIds || []
+                    propertyIds
                 }
             });
 
@@ -99,7 +132,7 @@ export class EventService {
         name?: string;
         type?: string;
         description?: string;
-        propertyIds?: string[];
+        properties?: { name: string; type: string; description: string }[];
     }): Promise<any> {
         try {
             const existingEvent = await prisma.event.findFirst({
@@ -136,18 +169,40 @@ export class EventService {
                 }
             }
 
-            // Validate property IDs if provided
-            if (data.propertyIds && data.propertyIds.length > 0) {
-                const validProperties = await prisma.property.findMany({
-                    where: {
-                        id: { in: data.propertyIds },
-                        deletedAt: null
+            let propertyIds: string[] = existingEvent.propertyIds || [];
+            if (data.properties && data.properties.length > 0) {
+                const newPropertyIds: string[] = [];
+                for (const propertyData of data.properties) {
+                    if (!propertyData.name || !propertyData.type || !propertyData.description) {
+                        throw new BadRequestError('Property name, type, and description are required');
                     }
-                });
-
-                if (validProperties.length !== data.propertyIds.length) {
-                    throw new BadRequestError('One or more property IDs are invalid');
+                    const existingProperty = await prisma.property.findFirst({
+                        where: {
+                            name: propertyData.name,
+                            type: propertyData.type,
+                            deletedAt: null
+                        }
+                    });
+                    let propertyId: string;
+                    if (existingProperty) {
+                        if (existingProperty.description !== propertyData.description) {
+                            throw new ConflictError(`Property '${propertyData.name}' of type '${propertyData.type}' already exists with a different description`);
+                        }
+                        propertyId = existingProperty.id;
+                    } else {
+                        const newProperty = await prisma.property.create({
+                            data: {
+                                name: propertyData.name,
+                                type: propertyData.type,
+                                description: propertyData.description
+                            }
+                        });
+                        propertyId = newProperty.id;
+                    }
+                    newPropertyIds.push(propertyId);
                 }
+                // Merge and deduplicate
+                propertyIds = Array.from(new Set([...propertyIds, ...newPropertyIds]));
             }
 
             const updatedEvent = await prisma.event.update({
@@ -156,7 +211,7 @@ export class EventService {
                     ...(data.name && { name: data.name }),
                     ...(data.type && { type: data.type }),
                     ...(data.description && { description: data.description }),
-                    ...(data.propertyIds && { propertyIds: data.propertyIds })
+                    propertyIds
                 }
             });
 

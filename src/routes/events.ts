@@ -7,13 +7,13 @@ const router = express.Router();
 
 router.post('/', async (req, res, next) => {
     try {
-        const { name, type, description, propertyIds } = req.body;
+        const { name, type, description, properties } = req.body;
 
         const event = await EventService.createEvent({
             name,
             type,
             description,
-            propertyIds
+            properties
         });
 
         res.status(201).json({
@@ -57,13 +57,13 @@ router.get('/:id', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, type, description, propertyIds } = req.body;
+        const { name, type, description, properties } = req.body;
 
         const updatedEvent = await EventService.updateEvent(id, {
             name,
             type,
             description,
-            propertyIds
+            properties
         });
 
         res.json({
