@@ -65,4 +65,6 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`API Documentation available at: http://localhost:${PORT}/api-docs`);
-}); 
+});
+
+export { app }; 
