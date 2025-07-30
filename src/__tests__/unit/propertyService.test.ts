@@ -1,5 +1,5 @@
 import { PropertyService } from '../../services/propertyService';
-import { NotFoundError } from '../../utils/exceptions';
+import { NotFoundError, BadRequestError, ConflictError } from '../../utils/exceptions';
 
 // Mock the Prisma client
 jest.mock('../../services/prisma', () => ({
@@ -97,7 +97,7 @@ describe('PropertyService', () => {
                 // missing type and description
             };
 
-            await expect(PropertyService.createProperty(invalidData as any)).rejects.toThrow('Missing required fields');
+            await expect(PropertyService.createProperty(invalidData as any)).rejects.toThrow(BadRequestError);
         });
 
         it('should throw BadRequestError for invalid property type', async () => {
@@ -107,7 +107,7 @@ describe('PropertyService', () => {
                 description: 'User ID',
             };
 
-            await expect(PropertyService.createProperty(invalidData)).rejects.toThrow('Invalid property type');
+            await expect(PropertyService.createProperty(invalidData)).rejects.toThrow(BadRequestError);
         });
 
         it('should throw ConflictError when property with same name and type exists', async () => {
@@ -119,7 +119,7 @@ describe('PropertyService', () => {
 
             mockPrisma.property.findFirst.mockResolvedValue({ id: 'existing' });
 
-            await expect(PropertyService.createProperty(propertyData)).rejects.toThrow('already exists');
+            await expect(PropertyService.createProperty(propertyData)).rejects.toThrow(ConflictError);
         });
     });
 
