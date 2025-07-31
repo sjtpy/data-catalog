@@ -1,20 +1,19 @@
 import express from 'express';
 import { ApiResponse } from '../types';
 import { EventService } from '../services/eventService';
-import { HttpError } from '../utils/exceptions';
+import {
+    validateCreateEventRequest,
+    validateUpdateEventRequest,
+    validateEventParams
+} from '../validators';
 
 const router = express.Router();
 
 router.post('/', async (req, res, next) => {
     try {
-        const { name, type, description, properties } = req.body;
+        const validatedData = validateCreateEventRequest(req.body);
 
-        const event = await EventService.createEvent({
-            name,
-            type,
-            description,
-            properties
-        });
+        const event = await EventService.createEvent(validatedData);
 
         res.status(201).json({
             success: true,
@@ -41,7 +40,7 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validateEventParams(req.params);
 
         const event = await EventService.getEventById(id);
 
@@ -56,15 +55,10 @@ router.get('/:id', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const { name, type, description, properties } = req.body;
+        const { id } = validateEventParams(req.params);
+        const validatedData = validateUpdateEventRequest(req.body);
 
-        const updatedEvent = await EventService.updateEvent(id, {
-            name,
-            type,
-            description,
-            properties
-        });
+        const updatedEvent = await EventService.updateEvent(id, validatedData);
 
         res.json({
             success: true,
@@ -78,7 +72,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validateEventParams(req.params);
 
         await EventService.deleteEvent(id);
 

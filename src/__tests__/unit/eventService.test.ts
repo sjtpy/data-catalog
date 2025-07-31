@@ -141,24 +141,30 @@ describe('EventService', () => {
     });
 
     describe('createEvent', () => {
-        it('should throw BadRequestError for missing required fields', async () => {
-            const invalidData = {
+        it('should create event with valid data (validation handled at route level)', async () => {
+            const validData = {
                 name: 'user_signup',
-                // missing type and description
-            };
-
-            await expect(EventService.createEvent(invalidData as any)).rejects.toThrow(BadRequestError);
-        });
-
-        it('should throw BadRequestError for invalid event type', async () => {
-            const invalidData = {
-                name: 'user_signup',
-                type: 'invalid_type',
+                type: 'page_view',
                 description: 'User signup event',
-                properties: [],
+                properties: []
             };
 
-            await expect(EventService.createEvent(invalidData)).rejects.toThrow(BadRequestError);
+            const mockCreatedEvent = {
+                id: '1',
+                ...validData,
+                propertyIds: [],
+                createTime: new Date(),
+                updateTime: new Date()
+            };
+
+            const mockInstance = (EventService as any).eventRepository;
+            mockInstance.findByNameAndType.mockResolvedValue(null);
+            mockInstance.create.mockResolvedValue(mockCreatedEvent);
+
+            const result = await EventService.createEvent(validData);
+
+            expect(result).toBeInstanceOf(Object);
+            expect(result.name).toBe('user_signup');
         });
     });
 }); 

@@ -1,1 +1,2 @@
-export * from './propertyValidators'; 
+export * from './propertyValidators';
+export * from './eventValidators'; 

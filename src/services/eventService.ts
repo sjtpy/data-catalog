@@ -1,4 +1,3 @@
-import { EventType } from '../types';
 import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
 import { EventRepository } from '../repositories/eventRepository';
 import { filterValidPropertyIds, processPropertyData } from '../utils/dataUtils';
@@ -12,16 +11,6 @@ export class EventService {
         description: string;
         properties?: { name: string; type: string; description: string }[];
     }): Promise<any> {
-        // existence validation
-        if (!data.name || !data.type || !data.description) {
-            throw new BadRequestError('Missing required fields: name, type, and description are required');
-        }
-
-        // Validate event type
-        if (!Object.values(EventType).includes(data.type as EventType)) {
-            throw new BadRequestError(`Invalid event type. Must be one of: ${Object.values(EventType).join(', ')}`);
-        }
-
         // Check for unique name and type
         const existingEvent = await this.eventRepository.findByNameAndType(data.name, data.type);
 
@@ -119,10 +108,7 @@ export class EventService {
                 throw new NotFoundError('Event not found');
             }
 
-            // Validate event type if provided
-            if (data.type && !Object.values(EventType).includes(data.type as EventType)) {
-                throw new BadRequestError(`Invalid event type. Must be one of: ${Object.values(EventType).join(', ')}`);
-            }
+
 
             // Check for unique name and type combination if name or type is being updated
             if (data.name || data.type) {
@@ -145,9 +131,6 @@ export class EventService {
             if (data.properties && data.properties.length > 0) {
                 const newPropertyIds: string[] = [];
                 for (const propertyData of data.properties) {
-                    if (!propertyData.name || !propertyData.type || !propertyData.description) {
-                        throw new BadRequestError('Property name, type, and description are required');
-                    }
                     const existingProperty = await this.eventRepository.findPropertyByNameAndType(propertyData.name, propertyData.type);
                     let propertyId: string;
                     if (existingProperty) {
