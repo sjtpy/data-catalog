@@ -1,18 +1,19 @@
 import express from 'express';
 import { ApiResponse } from '../types';
 import { TrackingPlanService } from '../services/trackingPlanService';
+import {
+    validateCreateTrackingPlanRequest,
+    validateUpdateTrackingPlanRequest,
+    validateTrackingPlanParams
+} from '../validators';
 
 const router = express.Router();
 
 router.post('/', async (req, res, next) => {
     try {
-        const { name, description, events } = req.body;
+        const validatedData = validateCreateTrackingPlanRequest(req.body);
 
-        const trackingPlan = await TrackingPlanService.createTrackingPlan({
-            name,
-            description,
-            events
-        });
+        const trackingPlan = await TrackingPlanService.createTrackingPlan(validatedData);
 
         res.status(201).json({
             success: true,
@@ -39,7 +40,7 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validateTrackingPlanParams(req.params);
 
         const trackingPlan = await TrackingPlanService.getTrackingPlanById(id);
 
@@ -54,14 +55,10 @@ router.get('/:id', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const { name, description, events } = req.body;
+        const { id } = validateTrackingPlanParams(req.params);
+        const validatedData = validateUpdateTrackingPlanRequest(req.body);
 
-        const updatedTrackingPlan = await TrackingPlanService.updateTrackingPlan(id, {
-            name,
-            description,
-            events
-        });
+        const updatedTrackingPlan = await TrackingPlanService.updateTrackingPlan(id, validatedData);
 
         res.json({
             success: true,
@@ -75,7 +72,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validateTrackingPlanParams(req.params);
 
         await TrackingPlanService.deleteTrackingPlan(id);
 

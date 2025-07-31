@@ -1,2 +1,3 @@
 export * from './propertyValidators';
-export * from './eventValidators'; 
+export * from './eventValidators';
+export * from './trackingPlanValidators'; 
