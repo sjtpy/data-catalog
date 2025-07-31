@@ -1,18 +1,19 @@
 import express from 'express';
 import { ApiResponse } from '../types';
 import { PropertyService } from '../services/propertyService';
+import {
+    validateCreatePropertyRequest,
+    validateUpdatePropertyRequest,
+    validatePropertyParams
+} from '../validators';
 
 const router = express.Router();
 
 router.post('/', async (req, res, next) => {
     try {
-        const { name, type, description } = req.body;
+        const validatedData = validateCreatePropertyRequest(req.body);
 
-        const property = await PropertyService.createProperty({
-            name,
-            type,
-            description
-        });
+        const property = await PropertyService.createProperty(validatedData);
 
         res.status(201).json({
             success: true,
@@ -39,7 +40,7 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validatePropertyParams(req.params);
 
         const property = await PropertyService.getPropertyById(id);
 
@@ -54,14 +55,10 @@ router.get('/:id', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const { name, type, description } = req.body;
+        const { id } = validatePropertyParams(req.params);
+        const validatedData = validateUpdatePropertyRequest(req.body);
 
-        const updatedProperty = await PropertyService.updateProperty(id, {
-            name,
-            type,
-            description
-        });
+        const updatedProperty = await PropertyService.updateProperty(id, validatedData);
 
         res.json({
             success: true,
@@ -75,7 +72,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const { id } = validatePropertyParams(req.params);
 
         await PropertyService.deleteProperty(id);
 

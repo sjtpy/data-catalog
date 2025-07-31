@@ -91,23 +91,27 @@ describe('PropertyService', () => {
             expect(result.name).toBe('user_id');
         });
 
-        it('should throw BadRequestError for missing required fields', async () => {
-            const invalidData = {
+        it('should create property with valid data (validation handled at route level)', async () => {
+            const validData = {
                 name: 'user_id',
-                // missing type and description
-            };
-
-            await expect(PropertyService.createProperty(invalidData as any)).rejects.toThrow(BadRequestError);
-        });
-
-        it('should throw BadRequestError for invalid property type', async () => {
-            const invalidData = {
-                name: 'user_id',
-                type: 'invalid_type',
+                type: 'string',
                 description: 'User ID',
             };
 
-            await expect(PropertyService.createProperty(invalidData)).rejects.toThrow(BadRequestError);
+            const mockCreatedProperty = {
+                id: '1',
+                ...validData,
+                createTime: new Date(),
+                updateTime: new Date(),
+            };
+
+            mockPrisma.property.findFirst.mockResolvedValue(null);
+            mockPrisma.property.create.mockResolvedValue(mockCreatedProperty);
+
+            const result = await PropertyService.createProperty(validData);
+
+            expect(result).toBeInstanceOf(Object);
+            expect(result.name).toBe('user_id');
         });
 
         it('should throw ConflictError when property with same name and type exists', async () => {

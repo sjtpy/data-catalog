@@ -1,5 +1,4 @@
-import { PropertyType } from '../types';
-import { BadRequestError, ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
+import { ConflictError, InternalServerError, NotFoundError, HttpError } from '../utils/exceptions';
 import { PropertyRepository } from '../repositories/propertyRepository';
 
 export class PropertyService {
@@ -10,15 +9,6 @@ export class PropertyService {
         type: string;
         description: string;
     }): Promise<any> {
-        // Validation
-        if (!data.name || !data.type || !data.description) {
-            throw new BadRequestError('Missing required fields: name, type, and description are required');
-        }
-
-        if (!Object.values(PropertyType).includes(data.type as PropertyType)) {
-            throw new BadRequestError(`Invalid property type. Must be one of: ${Object.values(PropertyType).join(', ')}`);
-        }
-
         // Check for existing property with same name and type
         const existingProperty = await this.propertyRepository.findByNameAndType(data.name, data.type);
 
@@ -83,10 +73,6 @@ export class PropertyService {
 
             if (!existingProperty) {
                 throw new NotFoundError('Property not found');
-            }
-
-            if (data.type && !Object.values(PropertyType).includes(data.type as PropertyType)) {
-                throw new BadRequestError(`Invalid property type. Must be one of: ${Object.values(PropertyType).join(', ')}`);
             }
 
             // Check for unique name and type combination if name or type is being updated
